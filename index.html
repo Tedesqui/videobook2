@@ -4,10 +4,13 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>𝐕𝐈𝐃𝐄𝐎𝐁𝐎𝐎𝐊 - IA que gera vídeos de páginas de livros</title>
+    
+    <script src="https://js.stripe.com/v3/"></script>
+    <script src="https://cdn.auth0.com/js/auth0-spa-js/2.0/auth0-spa-js.production.js"></script>
+
     <style>
         :root {
             --aws-orange: #FF9900;
-            --replicate-black: #1c1c1c;
             --dark-bg: #232F3E;
             --card-bg: #1e1e1e;
             --text-color: #FFFFFF;
@@ -18,17 +21,23 @@
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
             background-color: var(--dark-bg); color: var(--text-color);
             display: flex; flex-direction: column; align-items: center;
-            justify-content: center; overflow-y: auto;
+            justify-content: flex-start; overflow-y: auto; padding-top: 20px;
         }
         .container {
             width: 100%; max-width: 500px; padding: 20px;    
             box-sizing: border-box; display: flex; flex-direction: column;
             align-items: center; gap: 15px;
-            font-size: 70%; margin-top: 40px;
         }
-        h2 { text-align: center; margin-bottom: 10px; font-size: 1.54em; }
+        h2 { text-align: center; margin-bottom: 10px; font-size: 1.5em; }
+        
+        #auth-container { width: 90%; text-align: center; margin-bottom: 15px; }
+        #userProfile { background-color: var(--card-bg); padding: 15px; border-radius: var(--border-radius); }
+        #userProfile p { margin: 5px 0 15px 0; }
+        #credit-shop { margin-top: 15px; display: flex; flex-direction: column; gap: 10px; }
+        #credit-shop h4 { margin-top: 0; margin-bottom: 10px; }
+        
         #camera-container {
-            width: 100%; background-color: var(--card-bg);            
+            width: 100%; background-color: #000;            
             border-radius: var(--border-radius); overflow: hidden;
             position: relative; aspect-ratio: 4 / 4;
             display: flex; align-items: center; justify-content: center;
@@ -42,9 +51,9 @@
         .controls { display: flex; gap: 10px; width: 90%; }
         button {
             flex-grow: 1; padding: 12px 8px; font-size: 13px;
-            font-weight: bold; background-color: var(--replicate-black);
+            font-weight: bold; background-color: #333;
             color: white; border: 1px solid #444; border-radius: var(--border-radius);
-            cursor: pointer; transition: background-color 0.3s, transform 0.1s, opacity 0.3s;
+            cursor: pointer; transition: all 0.2s;
             display: flex; align-items: center; justify-content: center; gap: 8px;
         }
         #analyzeBtn, #generateVideoBtn { background-color: var(--aws-orange); color: #111; }
@@ -54,26 +63,42 @@
         #previewControls, #textConfirmationContainer { display: none; }
         .consistency-control {
             display: flex; align-items: center; gap: 8px;
-            cursor: pointer; user-select: none; margin-top: 10px; font-size: 1.3em;
+            cursor: pointer; user-select: none; font-size: 1.2em;
         }
         #ocrResultText {
             width: 90%; height: 100px; background-color: var(--card-bg);
             border: 1px solid #444; color: var(--text-color);
             border-radius: var(--border-radius); padding: 10px;
-            font-size: 16px; margin-top: 10px;
+            font-size: 16px; box-sizing: border-box;
         }
         #status {
-            text-align: center; min-height: 40px; color: #ccc; font-size: 1.3em;
+            text-align: center; min-height: 40px; color: #ccc; font-size: 1.2em;
         }
         #videoGerado { width: 100%; margin-top: 15px; }
         #videoGerado video { width: 100%; border-radius: var(--border-radius); border: 1px solid #333; }
-        .contact-info { margin-top: -40px; color: #aaa; font-size: 1.3em; text-align: center; }
+        .contact-info { margin-top: 20px; color: #aaa; font-size: 1.1em; text-align: center; }
     </style>
 </head>
 <body>
 
     <div class="container">
-        <h2>𝐕𝐈𝐃𝐄𝐎𝐁𝐎𝐎𝐊 - IA que gera vídeos de páginas de livros</h2>
+        <h2>𝐕𝐈𝐃𝐄𝐎𝐁𝐎𝐎𝐊</h2>
+
+        <div id="auth-container">
+            <button id="loginBtn">Login / Cadastrar</button>
+            <div id="userProfile" style="display:none;">
+                <p>Bem-vindo, <strong id="userEmail"></strong>!</p>
+                <p>Créditos restantes: <span id="userCredits" style="font-size: 1.5em; font-weight: bold;">?</span></p>
+                <button id="logoutBtn">Logout</button>
+                <div id="credit-shop">
+                    <h4>Comprar Créditos</h4>
+                    <button onclick="buyCredits('price_1PK...', 1)">Comprar 1 Crédito (R$ 3,49)</button>
+                    <button onclick="buyCredits('price_1PK...', 5)">Comprar 5 Créditos (R$ 17,45)</button>
+                    <button onclick="buyCredits('price_1PK...', 10)">Comprar 10 Créditos (R$ 34,90)</button>
+                </div>
+            </div>
+        </div>
+
         <div id="camera-container">
             <video id="camera" autoplay playsinline muted></video>
             <canvas id="snapshot"></canvas>
@@ -87,173 +112,210 @@
             <button id="analyzeBtn">✅ Ler Texto da Foto</button>
         </div>
         <div id="textConfirmationContainer">
-            <textarea id="ocrResultText"></textarea>
+            <textarea id="ocrResultText" placeholder="Confirme ou edite o texto aqui..."></textarea>
             <div class="controls" style="margin-top: 10px;">
-                <button id="generateVideoBtn">🎬 Gerar Vídeo</button>
+                <button id="generateVideoBtn">🎬 Gerar Vídeo (1 Crédito)</button>
             </div>
         </div>
         <div class="consistency-control">
             <input type="checkbox" id="consistencyCheck">
             <label for="consistencyCheck">Manter consistência</label>
         </div>
-        <p id="status">Aponte a câmera para um texto.</p>
+        <p id="status">Faça login para começar.</p>
         <div id="videoGerado"></div>
         <p class="contact-info">Contato: jeantedesqui@yahoo.com.br</p>
     </div>
 
     <script>
-        // IMPORTANTE: Substitua pela URL do seu backend na Vercel após o deploy.
+        // --- VARIÁVEIS DE CONFIGURAÇÃO ---
+        // IMPORTANTE: Substitua pela URL do seu backend na Vercel.
         const BACKEND_URL = 'https://SEU_APP_BACKEND.vercel.app';
+        // IMPORTANTE: Substitua pela sua chave publicável do Stripe.
+        const STRIPE_PUBLISHABLE_KEY = 'pk_test_...';
 
-        // --- Seleção dos Elementos do DOM ---
-        const ui = {
-            camera: document.getElementById('camera'),
-            snapshot: document.getElementById('snapshot'),
-            status: document.getElementById('status'),
-            videoGerado: document.getElementById('videoGerado'),
-            ocrResultText: document.getElementById('ocrResultText'),
-            consistencyCheck: document.getElementById('consistencyCheck'),
-            buttons: {
-                zoom: document.getElementById('zoomBtn'),
-                takePhoto: document.getElementById('takePhotoBtn'),
-                retry: document.getElementById('retryBtn'),
-                analyze: document.getElementById('analyzeBtn'),
-                generateVideo: document.getElementById('generateVideoBtn'),
-            },
-            containers: {
-                initialControls: document.getElementById('initialControls'),
-                previewControls: document.getElementById('previewControls'),
-                textConfirmation: document.getElementById('textConfirmationContainer'),
-            }
-        };
+        // --- SELEÇÃO DE ELEMENTOS DO DOM ---
+        const ui = { /* ... (código igual ao anterior, omitido por brevidade) ... */ };
 
-        // --- Variáveis de Estado da Aplicação ---
+        // --- VARIÁVEIS DE ESTADO ---
+        let auth0 = null;
         let mediaTrack = null, currentZoom = 1;
         const zoomLevels = [1, 2, 3];
         let zoomCapabilities = null, lastUsedSeed = null;
+        
+        // --- LÓGICA DE AUTENTICAÇÃO (AUTH0) ---
+        const configureClient = async () => {
+          auth0 = await auth0.createAuth0Client({
+            domain: "SEU_AUTH0_DOMAIN", // Substitua pelo seu Domain do Auth0
+            clientId: "SEU_AUTH0_CLIENT_ID", // Substitua pelo seu Client ID do Auth0
+            authorizationParams: {
+              audience: "SUA_AUTH0_AUDIENCE" // Substitua pela Audience (Identifier da sua API no Auth0)
+            }
+          });
+        };
 
-        // --- Funções Principais ---
-        async function startCamera() {
-            ui.status.textContent = "A iniciar câmera...";
+        window.onload = async () => {
+            await configureClient();
+            updateUI();
+            
+            const isAuthenticated = await auth0.isAuthenticated();
+            if (location.search.includes("code=") && location.search.includes("state=")) {
+                await auth0.handleRedirectCallback();
+                window.history.replaceState({}, document.title, "/");
+            }
+            // Se o pagamento foi sucesso, mostra uma mensagem e atualiza os créditos
+            if (location.search.includes("payment=success")) {
+                document.getElementById('status').textContent = "✅ Pagamento recebido com sucesso! Créditos adicionados.";
+                window.history.replaceState({}, document.title, "/");
+            }
+            updateUI();
+        };
+
+        const updateUI = async () => {
+            const isAuthenticated = await auth0.isAuthenticated();
+            document.getElementById('loginBtn').style.display = isAuthenticated ? 'none' : 'block';
+            document.getElementById('userProfile').style.display = isAuthenticated ? 'block' : 'none';
+            document.getElementById('camera-container').style.display = isAuthenticated ? 'flex' : 'none';
+            document.getElementById('initialControls').style.display = isAuthenticated ? 'flex' : 'none';
+
+            if (isAuthenticated) {
+                const user = await auth0.getUser();
+                document.getElementById('userEmail').innerText = user.email;
+                document.getElementById('status').textContent = "Câmera pronta. Aponte para um texto.";
+                await fetchUserStatus();
+                startCamera(); // Inicia a câmera somente após o login
+            } else {
+                document.getElementById('status').textContent = "Faça login para começar a usar o Videobook.";
+            }
+        };
+
+        const fetchUserStatus = async () => {
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1280 } } });
-                ui.camera.srcObject = stream;
-                mediaTrack = stream.getVideoTracks()[0];
-                zoomCapabilities = mediaTrack.getCapabilities().zoom;
-                if (!zoomCapabilities) {
-                    ui.buttons.zoom.disabled = true;
-                    ui.buttons.zoom.innerText = "Zoom N/A";
-                }
-                ui.status.textContent = "Câmera pronta. Aponte para um texto.";
-            } catch (err) {
-                ui.status.textContent = `❌ Erro ao iniciar a câmera: ${err.message}`;
+                const accessToken = await auth0.getTokenSilently();
+                const response = await fetch(`${BACKEND_URL}/api/get-user-status`, {
+                    headers: { Authorization: `Bearer ${accessToken}` }
+                });
+                if (!response.ok) throw new Error("Não foi possível buscar os créditos.");
+                const data = await response.json();
+                document.getElementById('userCredits').innerText = data.credits;
+            } catch(e) {
+                console.error(e);
+                document.getElementById('userCredits').innerText = "Erro";
+            }
+        };
+
+        const login = () => auth0.loginWithRedirect({ authorizationParams: { redirect_uri: window.location.origin }});
+        const logout = () => auth0.logout({ logoutParams: { returnTo: window.location.origin }});
+
+        // --- LÓGICA DE PAGAMENTO (STRIPE) ---
+        async function buyCredits(priceId, creditsAmount) {
+            document.getElementById('status').textContent = "Redirecionando para o pagamento...";
+            try {
+                const accessToken = await auth0.getTokenSilently();
+                const response = await fetch(`${BACKEND_URL}/api/create-checkout-session`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+                    body: JSON.stringify({ priceId: priceId, creditsAmount: creditsAmount })
+                });
+                const session = await response.json();
+                if (!response.ok) throw new Error(session.error);
+
+                const stripe = Stripe(STRIPE_PUBLISHABLE_KEY);
+                await stripe.redirectToCheckout({ sessionId: session.id });
+            } catch(e) {
+                console.error("Erro ao iniciar a compra:", e);
+                document.getElementById('status').textContent = `❌ Erro: ${e.message}`;
             }
         }
 
-        function toggleZoom() {
-            if (!zoomCapabilities) return;
-            const currentIndex = zoomLevels.indexOf(currentZoom);
-            currentZoom = zoomLevels[(currentIndex + 1) % zoomLevels.length];
-            if (currentZoom > zoomCapabilities.max) currentZoom = zoomLevels[0];
-            mediaTrack.applyConstraints({ advanced: [{ zoom: currentZoom }] });
-            ui.buttons.zoom.innerText = `🔍 Zoom ${currentZoom}x`;
-        }
-
-        function takePhoto() {
-            ui.snapshot.width = ui.camera.videoWidth;
-            ui.snapshot.height = ui.camera.videoHeight;
-            ui.snapshot.getContext('2d').drawImage(ui.camera, 0, 0, ui.snapshot.width, ui.snapshot.height);
-            ui.snapshot.style.display = 'block';
-            ui.camera.style.display = 'none';
-            ui.containers.initialControls.style.display = 'none';
-            ui.containers.previewControls.style.display = 'flex';
-            ui.status.textContent = "Foto capturada. Deseja ler o texto?";
-        }
-
-        function resetPhoto() {
-            ui.camera.style.display = 'block';
-            ui.snapshot.style.display = 'none';
-            ui.containers.previewControls.style.display = 'none';
-            ui.containers.initialControls.style.display = 'flex';
-            ui.containers.textConfirmation.style.display = 'none';
-            ui.status.textContent = "Câmera pronta. Aponte para um texto.";
-            ui.videoGerado.innerHTML = '';
-        }
+        // --- LÓGICA PRINCIPAL DA APLICAÇÃO ---
+        async function startCamera() { /* ... (código da função igual ao anterior) ... */ }
+        function toggleZoom() { /* ... (código da função igual ao anterior) ... */ }
+        function takePhoto() { /* ... (código da função igual ao anterior) ... */ }
+        function resetPhoto() { /* ... (código da função igual ao anterior) ... */ }
 
         async function analyzePhoto() {
-            ui.buttons.analyze.disabled = true;
-            ui.buttons.retry.disabled = true;
-            ui.status.textContent = "🧠 Lendo o texto...";
+             const isAuthenticated = await auth0.isAuthenticated();
+            if (!isAuthenticated) {
+                ui.status.textContent = "Por favor, faça login para analisar fotos.";
+                return;
+            }
+            const accessToken = await auth0.getTokenSilently();
+            document.getElementById('analyzeBtn').disabled = true;
+            document.getElementById('retryBtn').disabled = true;
+            document.getElementById('status').textContent = "🧠 Lendo o texto...";
             try {
-                const imageBase64 = ui.snapshot.toDataURL('image/png');
+                const imageBase64 = document.getElementById('snapshot').toDataURL('image/png');
                 const response = await fetch(`${BACKEND_URL}/api/ocr-aws`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
                     body: JSON.stringify({ imageBase64 })
                 });
                 const data = await response.json();
                 if (!response.ok) throw new Error(data.error || "Falha ao ler texto.");
-                
-                ui.ocrResultText.value = data.text;
-                ui.containers.previewControls.style.display = 'none';
-                ui.containers.textConfirmation.style.display = 'block';
-                ui.status.textContent = "Confirme ou edite o texto lido.";
+                document.getElementById('ocrResultText').value = data.text;
+                document.getElementById('previewControls').style.display = 'none';
+                document.getElementById('textConfirmationContainer').style.display = 'block';
+                document.getElementById('status').textContent = "Confirme ou edite o texto lido.";
             } catch (error) {
-                ui.status.textContent = `❌ Erro no OCR: ${error.message}`;
+                document.getElementById('status').textContent = `❌ Erro no OCR: ${error.message}`;
             } finally {
-                ui.buttons.analyze.disabled = false;
-                ui.buttons.retry.disabled = false;
+                document.getElementById('analyzeBtn').disabled = false;
+                document.getElementById('retryBtn').disabled = false;
             }
         }
         
         async function generateVideo() {
-            ui.buttons.generateVideo.disabled = true;
-            ui.videoGerado.innerHTML = '';
-            const prompt = ui.ocrResultText.value;
+            const isAuthenticated = await auth0.isAuthenticated();
+            if (!isAuthenticated) {
+                document.getElementById('status').textContent = "Por favor, faça login para gerar um vídeo.";
+                return;
+            }
+            const accessToken = await auth0.getTokenSilently();
+
+            document.getElementById('generateVideoBtn').disabled = true;
+            document.getElementById('videoGerado').innerHTML = '';
+            const prompt = document.getElementById('ocrResultText').value;
 
             if (!prompt || prompt.length < 5) {
-                ui.status.textContent = "❌ Erro: O texto é muito curto para gerar um vídeo.";
-                ui.buttons.generateVideo.disabled = false;
+                document.getElementById('status').textContent = "❌ Erro: O texto é muito curto para gerar um vídeo.";
+                document.getElementById('generateVideoBtn').disabled = false;
                 return;
             }
             
-            ui.status.textContent = `🎬 Criando vídeo... (Isto pode demorar)`;
+            document.getElementById('status').textContent = `🎬 Criando vídeo... (Isto pode demorar)`;
             try {
                 const bodyPayload = { prompt };
-                if (ui.consistencyCheck.checked && lastUsedSeed !== null) {
+                if (document.getElementById('consistencyCheck').checked && lastUsedSeed !== null) {
                     bodyPayload.seed = lastUsedSeed;
                 }
                 const response = await fetch(`${BACKEND_URL}/api/gerar-video-fal`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
                     body: JSON.stringify(bodyPayload)
                 });
                 const data = await response.json();
                 if (!response.ok) throw new Error(data.error || "Falha na geração do vídeo.");
                 
                 if (data.videoURL) {
-                    ui.videoGerado.innerHTML = `<video src="${data.videoURL}" controls autoplay loop></video>`;
-                    ui.status.textContent = "✅ Vídeo gerado com sucesso!";
+                    document.getElementById('videoGerado').innerHTML = `<video src="${data.videoURL}" controls autoplay loop></video>`;
+                    document.getElementById('status').textContent = "✅ Vídeo gerado com sucesso!";
                     lastUsedSeed = data.seed; 
+                    document.getElementById('userCredits').innerText = data.remainingCredits; // Atualiza os créditos na UI
                 } else {
                     throw new Error("Não foi possível obter o URL do vídeo gerado.");
                 }
             } catch (error) {
-                ui.status.textContent = `❌ Erro na geração do vídeo: ${error.message}`;
+                document.getElementById('status').textContent = `❌ ${error.message}`;
             } finally {
-                ui.buttons.generateVideo.disabled = false;
+                document.getElementById('generateVideoBtn').disabled = false;
             }
         }
 
         // --- Adicionar Event Listeners ---
-        ui.buttons.zoom.addEventListener('click', toggleZoom);
-        ui.buttons.takePhoto.addEventListener('click', takePhoto);
-        ui.buttons.retry.addEventListener('click', resetPhoto);
-        ui.buttons.analyze.addEventListener('click', analyzePhoto);
-        ui.buttons.generateVideo.addEventListener('click', generateVideo);
-        
-        // --- Iniciar a Aplicação ---
-        startCamera();
+        document.getElementById('loginBtn').addEventListener('click', login);
+        document.getElementById('logoutBtn').addEventListener('click', logout);
+        // ... (resto dos event listeners para os botões da câmera) ...
+
     </script>
 </body>
 </html>
