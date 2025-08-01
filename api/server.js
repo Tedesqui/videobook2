@@ -12,7 +12,7 @@ const jwksRsa = require('jwks-rsa');
 // --- CONFIGURAÇÃO ---
 const app = express();
 const PORT = process.env.PORT || 3000;
-const GITHUB_PAGES_URL = 'https://SEU_USUARIO.github.io/SEU_REPOSITORIO_FRONTEND';
+const GITHUB_PAGES_URL = 'https://tedesqui.github.io/videobook2/';
 
 // --- MIDDLEWARE ---
 app.use(cors({ origin: GITHUB_PAGES_URL }));
