@@ -145,10 +145,10 @@
         // --- LÓGICA DE AUTENTICAÇÃO (AUTH0) ---
         const configureClient = async () => {
           auth0 = await auth0.createAuth0Client({
-            domain: "SEU_AUTH0_DOMAIN", // Substitua pelo seu Domain do Auth0
-            clientId: "SEU_AUTH0_CLIENT_ID", // Substitua pelo seu Client ID do Auth0
+            domain: "tedesqui.us.auth0.com", // Substitua pelo seu Domain do Auth0
+            clientId: "0FTFOLrJ0BtlapVRJjKbphNgLxy0OmJp", // Substitua pelo seu Client ID do Auth0
             authorizationParams: {
-              audience: "SUA_AUTH0_AUDIENCE" // Substitua pela Audience (Identifier da sua API no Auth0)
+              audience: "688cc1a6bd02d6e9310ebd67" // Substitua pela Audience (Identifier da sua API no Auth0)
             }
           });
         };
