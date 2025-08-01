@@ -10,7 +10,7 @@ const PORT = process.env.PORT || 3000;
 
 // --- CONFIGURAÇÃO DE CORS ---
 // IMPORTANTE: Substitua pela URL real do seu frontend na GitHub Pages.
-const GITHUB_PAGES_URL = 'https://SEU_USUARIO.github.io/SEU_REPOSITORIO_FRONTEND'; 
+const GITHUB_PAGES_URL = 'https://tedesqui.github.io/videobook2/'; 
 app.use(cors({
   origin: GITHUB_PAGES_URL
 }));
