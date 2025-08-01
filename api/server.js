@@ -57,7 +57,7 @@ app.post('/api/gerar-video-fal', async (req, res) => {
         return res.status(400).json({ error: "O texto (prompt) é obrigatório." });
     }
 
-    const FAL_MODEL_URL = 'https://fal.run/fal-ai/wan-2-2';
+    const FAL_MODEL_URL = 'https://fal.run/fal-ai/wan/v2.2-5b/text-to-video';
     const payload = {
         prompt: prompt,
         image_size: "square_hd",
